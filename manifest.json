@@ -4,7 +4,7 @@
   "kind": "platform_service",
   "id": "piphi.service.zigbee2mqtt-sidecar",
   "name": "Zigbee2MQTT Sidecar",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "PiPhi sidecar service for detecting Zigbee coordinators and rendering Zigbee2MQTT bridge configuration.",
   "metadata": {
     "generator": "piphi-network-create",
@@ -17,19 +17,30 @@
       "linux": {
         "mode": "container",
         "supervisor": "docker",
-        "recommended_for": ["usb_coordinator", "network_coordinator"]
+        "recommended_for": [
+          "usb_coordinator",
+          "network_coordinator"
+        ]
       },
       "windows": {
         "mode": "native_process",
         "supervisor": "pm2",
-        "recommended_for": ["usb_coordinator"],
-        "docker_supported_for": ["network_coordinator"]
+        "recommended_for": [
+          "usb_coordinator"
+        ],
+        "docker_supported_for": [
+          "network_coordinator"
+        ]
       },
       "macos": {
         "mode": "native_process",
         "supervisor": "pm2",
-        "recommended_for": ["usb_coordinator"],
-        "docker_supported_for": ["network_coordinator"]
+        "recommended_for": [
+          "usb_coordinator"
+        ],
+        "docker_supported_for": [
+          "network_coordinator"
+        ]
       }
     }
   },
@@ -38,7 +49,7 @@
     "website": "https://piphi.io"
   },
   "license": "Apache-2.0",
-  "image": "piphinetwork/zigbee2mqtt-sidecar:0.1.0",
+  "image": "piphinetwork/zigbee2mqtt-sidecar:0.1.1",
   "platforms": [
     "linux",
     "windows",
@@ -48,7 +59,7 @@
     "linux": {
       "type": "container",
       "container": {
-        "image": "piphinetwork/zigbee2mqtt-sidecar:0.1.0",
+        "image": "piphinetwork/zigbee2mqtt-sidecar:0.1.1",
         "ports": [
           {
             "container": 8720,
@@ -101,11 +112,17 @@
             "process_name": "piphi-zigbee2mqtt",
             "config_path": "%PROGRAMDATA%\\PiPhi\\zigbee2mqtt\\configuration.yaml",
             "data_path": "%PROGRAMDATA%\\PiPhi\\zigbee2mqtt",
-            "coordinator_ports": ["COM*"],
-            "preferred_for": ["usb_coordinator"],
+            "coordinator_ports": [
+              "COM*"
+            ],
+            "preferred_for": [
+              "usb_coordinator"
+            ],
             "docker_mode": {
               "supported": true,
-              "preferred_for": ["network_coordinator"],
+              "preferred_for": [
+                "network_coordinator"
+              ],
               "reason": "Avoid Docker Desktop USB serial passthrough for local USB coordinators."
             }
           }
@@ -126,7 +143,13 @@
             "label": "Adapter Type",
             "type": "select",
             "required": false,
-            "options": ["zstack", "ember", "deconz", "zigate", "zboss"]
+            "options": [
+              "zstack",
+              "ember",
+              "deconz",
+              "zigate",
+              "zboss"
+            ]
           }
         ]
       }
@@ -148,11 +171,18 @@
             "process_name": "piphi-zigbee2mqtt",
             "config_path": "~/Library/Application Support/PiPhi/zigbee2mqtt/configuration.yaml",
             "data_path": "~/Library/Application Support/PiPhi/zigbee2mqtt",
-            "coordinator_ports": ["/dev/cu.usbserial-*", "/dev/cu.usbmodem-*"],
-            "preferred_for": ["usb_coordinator"],
+            "coordinator_ports": [
+              "/dev/cu.usbserial-*",
+              "/dev/cu.usbmodem-*"
+            ],
+            "preferred_for": [
+              "usb_coordinator"
+            ],
             "docker_mode": {
               "supported": true,
-              "preferred_for": ["network_coordinator"],
+              "preferred_for": [
+                "network_coordinator"
+              ],
               "reason": "Avoid Docker Desktop USB serial passthrough for local USB coordinators."
             }
           }
@@ -173,7 +203,13 @@
             "label": "Adapter Type",
             "type": "select",
             "required": false,
-            "options": ["zstack", "ember", "deconz", "zigate", "zboss"]
+            "options": [
+              "zstack",
+              "ember",
+              "deconz",
+              "zigate",
+              "zboss"
+            ]
           }
         ]
       }
