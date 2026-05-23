@@ -1,0 +1,152 @@
+from __future__ import annotations
+
+from typing import Any
+
+ENDPOINTS = {
+    "health": "/health",
+    "diagnostics": "/diagnostics",
+    "discover": "/discover",
+    "entities": "/entities",
+    "state": "/state",
+    "config": "/config",
+    "config_sync": "/config/sync",
+    "deconfigure": "/deconfigure",
+    "ui_config": "/ui-config",
+    "events": "/events",
+    "command": "/command",
+    "bridge_snapshot": "/v1/snapshot",
+    "bridge_adapters": "/v1/adapters",
+    "bridge_config_render": "/v1/config/render",
+    "bridge_config_write": "/v1/config/write",
+    "bridge_apply": "/v1/apply",
+    "bridge_supervisor_status": "/v1/supervisor/status",
+    "bridge_supervisor_start": "/v1/supervisor/start",
+    "bridge_supervisor_stop": "/v1/supervisor/stop",
+    "bridge_supervisor_restart": "/v1/supervisor/restart",
+    "bridge_supervisor_logs": "/v1/supervisor/logs",
+    "bridge_prerequisites": "/v1/prerequisites",
+    "bridge_mqtt_check": "/v1/mqtt/check",
+}
+
+REQUIRED_ENDPOINTS = ["health", "entities", "command", "config", "ui_config"]
+
+CAPABILITIES: dict[str, dict[str, Any]] = {
+    "connected": {
+        "kind": "sensor",
+        "unit": "bool"
+    },
+    "refresh": {
+        "kind": "action"
+    },
+    "service_available": {
+        "kind": "sensor",
+        "unit": "bool"
+    },
+    "bridge_configured": {
+        "kind": "sensor",
+        "unit": "bool"
+    },
+    "adapter_detected": {
+        "kind": "sensor",
+        "unit": "count"
+    },
+    "render_config": {
+        "kind": "action"
+    }
+}
+
+COMMANDS: dict[str, dict[str, Any]] = {
+    "refresh": {
+        "description": "Refresh the device state.",
+        "timeout_ms": 5000
+    },
+    "render_config": {
+        "description": "Render or write Zigbee2MQTT configuration.yaml.",
+        "timeout_ms": 10000
+    }
+}
+
+CONFIG_SCHEMA: dict[str, Any] = {
+    "schema": {
+        "title": "Zigbee2MQTT Sidecar Setup",
+        "type": "object",
+        "required": [
+            "serial_port"
+        ],
+        "properties": {
+            "serial_port": {
+                "type": "string",
+                "title": "Coordinator Port"
+            },
+            "adapter": {
+                "type": "string",
+                "title": "Adapter Type",
+                "enum": ["zstack", "ember", "deconz", "zigate", "zboss"]
+            },
+            "mqtt_server": {
+                "type": "string",
+                "title": "MQTT Server"
+            },
+            "mqtt_base_topic": {
+                "type": "string",
+                "title": "MQTT Base Topic"
+            },
+            "data_path": {
+                "type": "string",
+                "title": "Zigbee2MQTT Data Path"
+            }
+        }
+    },
+    "uiSchema": {
+        "serial_port": {
+            "placeholder": "/dev/serial/by-id/usb-... or COM4"
+        },
+        "adapter": {
+            "placeholder": "ember"
+        },
+        "mqtt_server": {
+            "placeholder": "mqtt://127.0.0.1:1883"
+        },
+        "mqtt_base_topic": {
+            "placeholder": "zigbee2mqtt"
+        },
+        "data_path": {
+            "placeholder": "/app/data"
+        }
+    }
+}
+
+FALLBACK_ENTITY: dict[str, Any] = {
+    "id": "zigbee2mqtt-bridge",
+    "name": "Zigbee2MQTT Bridge",
+    "device_id": "zigbee2mqtt-bridge",
+    "entity_type": "service",
+    "capabilities": [
+        "connected",
+        "refresh",
+        "service_available",
+        "bridge_configured",
+        "adapter_detected",
+        "render_config"
+    ],
+    "available_commands": [
+        {
+            "id": "refresh",
+            "label": "Refresh",
+            "kind": "action"
+        },
+        {
+            "id": "render_config",
+            "label": "Render Config",
+            "kind": "action"
+        }
+    ],
+    "dashboard": {
+        "allowed_widgets": [
+            "tile",
+            "stat",
+            "button"
+        ],
+        "default_widget": "tile"
+    }
+}

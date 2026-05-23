@@ -1,0 +1,32 @@
+{
+  "behaviorSchemaVersion": "integration.behaviors.v2",
+  "devices": [
+    {
+      "id": "zigbee2mqtt_bridge",
+      "name": "Zigbee2MQTT Bridge",
+      "actions": [
+        {
+          "id": "refresh",
+          "name": "Refresh bridge status",
+          "runtime": {
+            "command": "refresh"
+          },
+          "safety": {
+            "riskLevel": "low"
+          }
+        },
+        {
+          "id": "render_config",
+          "name": "Render bridge configuration",
+          "runtime": {
+            "command": "render_config"
+          },
+          "safety": {
+            "riskLevel": "medium"
+          }
+        }
+      ]
+    }
+  ],
+  "templates": []
+}
