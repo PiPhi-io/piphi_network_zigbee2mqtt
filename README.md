@@ -51,6 +51,9 @@ Bridge-specific routes:
 - `POST /v1/supervisor/restart`
 - `POST /v1/supervisor/logs`
 - `POST /v1/mqtt/check`
+- `POST /v1/devices`
+- `GET /v1/devices`
+- `POST /v1/permit-join`
 
 ## Render a Zigbee2MQTT Config
 
@@ -144,6 +147,29 @@ Check MQTT broker reachability:
 curl -s http://127.0.0.1:8720/v1/mqtt/check \
   -H 'content-type: application/json' \
   -d '{"server": "mqtt://127.0.0.1:1883"}'
+```
+
+Read the retained Zigbee2MQTT device inventory:
+
+```bash
+curl -s http://127.0.0.1:8720/v1/devices \
+  -H 'content-type: application/json' \
+  -d '{
+    "server": "mqtt://127.0.0.1:1883",
+    "base_topic": "zigbee2mqtt"
+  }'
+```
+
+Open pairing for 60 seconds:
+
+```bash
+curl -s http://127.0.0.1:8720/v1/permit-join \
+  -H 'content-type: application/json' \
+  -d '{
+    "server": "mqtt://127.0.0.1:1883",
+    "base_topic": "zigbee2mqtt",
+    "time": 60
+  }'
 ```
 
 ## Production Apply Flow

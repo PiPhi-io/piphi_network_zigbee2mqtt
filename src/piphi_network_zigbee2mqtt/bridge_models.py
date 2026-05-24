@@ -199,6 +199,75 @@ class MqttCheckResponse(BaseModel):
     message: str | None = None
 
 
+class Zigbee2MqttApiRequest(BaseModel):
+    server: str | None = None
+    base_topic: str | None = None
+    timeout_seconds: float = Field(default=8.0, ge=0.5, le=60.0)
+    dry_run: bool = False
+
+    @field_validator("base_topic")
+    @classmethod
+    def normalize_base_topic(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        token = str(value or "").strip().strip("/")
+        if not token:
+            raise ValueError("base_topic cannot be blank.")
+        return token
+
+
+class Zigbee2MqttDevice(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    friendly_name: str
+    ieee_address: str | None = None
+    type: str | None = None
+    interview_completed: bool | None = None
+    interviewing: bool | None = None
+    supported: bool | None = None
+    definition: dict[str, Any] | None = None
+    power_source: str | None = None
+    date_code: str | None = None
+
+
+class DeviceListRequest(Zigbee2MqttApiRequest):
+    pass
+
+
+class DeviceListResponse(BaseModel):
+    ok: bool
+    status: str
+    devices: list[Zigbee2MqttDevice] = Field(default_factory=list)
+    server: str
+    base_topic: str
+    request_topic: str | None = None
+    response_topic: str
+    transaction: str | None = None
+    message: str | None = None
+    raw: Any | None = None
+
+
+class PermitJoinRequest(Zigbee2MqttApiRequest):
+    value: bool = True
+    time: int = Field(default=60, ge=1, le=3600)
+    device: str | None = None
+
+
+class PermitJoinResponse(BaseModel):
+    ok: bool
+    status: str
+    value: bool
+    time: int
+    device: str | None = None
+    server: str
+    base_topic: str
+    request_topic: str
+    response_topic: str
+    transaction: str | None = None
+    message: str | None = None
+    raw: Any | None = None
+
+
 class ApplyBridgeRequest(WriteConfigRequest):
     supervisor: SupervisorRequest | None = None
     restart_policy: RestartPolicy = "changed"
@@ -224,6 +293,8 @@ class SidecarStore:
         self.last_error: str | None = None
         self.last_supervisor: SupervisorResponse | None = None
         self.last_mqtt_check: MqttCheckResponse | None = None
+        self.last_devices: DeviceListResponse | None = None
+        self.last_permit_join: PermitJoinResponse | None = None
 
     def snapshot(self) -> BridgeSnapshot:
         config = self.current_config
@@ -242,6 +313,8 @@ class SidecarStore:
             last_error=self.last_error,
             supervisor=self.last_supervisor.model_dump(mode="json") if self.last_supervisor else None,
             mqtt_check=self.last_mqtt_check.model_dump(mode="json") if self.last_mqtt_check else None,
+            devices=self.last_devices.model_dump(mode="json") if self.last_devices else None,
+            permit_join=self.last_permit_join.model_dump(mode="json") if self.last_permit_join else None,
         )
 
 

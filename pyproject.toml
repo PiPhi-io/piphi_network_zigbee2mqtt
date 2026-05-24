@@ -5,6 +5,7 @@ description = "Piphi Network Zigbee2mqtt PiPhi sidecar runtime."
 requires-python = ">=3.11"
 dependencies = [
   "fastapi>=0.115.0",
+  "paho-mqtt>=2.1.0",
   "pyserial>=3.5",
   "uvicorn[standard]>=0.30.0",
   "piphi-runtime-kit-python>=0.3.0,<1.0.0",

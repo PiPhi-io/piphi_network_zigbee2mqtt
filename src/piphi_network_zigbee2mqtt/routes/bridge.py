@@ -6,7 +6,9 @@ from ..adapter_detector import discover_adapters
 from ..bridge_models import (
     ApplyBridgeRequest,
     ApplyBridgeResponse,
+    DeviceListRequest,
     MqttCheckRequest,
+    PermitJoinRequest,
     PrerequisiteCheckRequest,
     SupervisorLogsRequest,
     SupervisorRequest,
@@ -17,6 +19,11 @@ from ..config_renderer import render_zigbee2mqtt_config
 from ..config_store import write_config_atomic
 from ..state import sidecar_store
 from ..supervisor import check_prerequisites, supervise, supervisor_logs
+from ..zigbee2mqtt_mqtt import (
+    Zigbee2MqttMqttClient,
+    Zigbee2MqttMqttError,
+    resolve_mqtt_settings,
+)
 
 router = APIRouter(prefix="/v1", tags=["zigbee2mqtt-bridge"])
 
@@ -29,6 +36,57 @@ async def snapshot():
 @router.get("/adapters")
 async def adapters():
     return {"adapters": discover_adapters()}
+
+
+@router.post("/devices")
+async def devices(payload: DeviceListRequest | None = None):
+    request = payload or DeviceListRequest()
+    try:
+        mqtt_settings = resolve_mqtt_settings(
+            current=sidecar_store.current_config.mqtt if sidecar_store.current_config else None,
+            server=request.server,
+            base_topic=request.base_topic,
+        )
+        result = await Zigbee2MqttMqttClient(
+            mqtt=mqtt_settings,
+            timeout_seconds=request.timeout_seconds,
+        ).list_devices(dry_run=request.dry_run)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Zigbee2MqttMqttError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    sidecar_store.last_devices = result
+    return result
+
+
+@router.get("/devices")
+async def devices_get():
+    return await devices(DeviceListRequest())
+
+
+@router.post("/permit-join")
+async def permit_join(payload: PermitJoinRequest):
+    try:
+        mqtt_settings = resolve_mqtt_settings(
+            current=sidecar_store.current_config.mqtt if sidecar_store.current_config else None,
+            server=payload.server,
+            base_topic=payload.base_topic,
+        )
+        result = await Zigbee2MqttMqttClient(
+            mqtt=mqtt_settings,
+            timeout_seconds=payload.timeout_seconds,
+        ).permit_join(
+            value=payload.value,
+            time=payload.time,
+            device=payload.device,
+            dry_run=payload.dry_run,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Zigbee2MqttMqttError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    sidecar_store.last_permit_join = result
+    return result
 
 
 @router.post("/config/render")

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 from pathlib import Path
 from typing import Protocol
 
@@ -18,20 +19,48 @@ from .bridge_models import (
 
 
 class CommandRunner(Protocol):
-    async def run(self, command: list[str], *, cwd: str | None = None, env: dict[str, str] | None = None) -> CommandResult:
+    async def run(
+        self,
+        command: list[str],
+        *,
+        cwd: str | None = None,
+        env: dict[str, str] | None = None,
+        timeout_seconds: float = 30.0,
+    ) -> CommandResult:
         ...
 
 
 class AsyncioCommandRunner:
-    async def run(self, command: list[str], *, cwd: str | None = None, env: dict[str, str] | None = None) -> CommandResult:
-        process = await asyncio.create_subprocess_exec(
-            *command,
-            cwd=cwd,
-            env=env or None,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        stdout, stderr = await process.communicate()
+    async def run(
+        self,
+        command: list[str],
+        *,
+        cwd: str | None = None,
+        env: dict[str, str] | None = None,
+        timeout_seconds: float = 30.0,
+    ) -> CommandResult:
+        try:
+            process = await asyncio.create_subprocess_exec(
+                *command,
+                cwd=cwd,
+                env=env or None,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+        except FileNotFoundError as exc:
+            return CommandResult(command=command, returncode=127, stderr=str(exc))
+
+        try:
+            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=timeout_seconds)
+        except TimeoutError:
+            process.kill()
+            stdout, _stderr = await process.communicate()
+            return CommandResult(
+                command=command,
+                returncode=124,
+                stdout=stdout.decode(errors="replace").strip(),
+                stderr=f"command timed out after {timeout_seconds:g}s",
+            )
         return CommandResult(
             command=command,
             returncode=int(process.returncode or 0),
@@ -233,13 +262,14 @@ def _response(
     results: list[CommandResult],
     ok: bool,
 ) -> SupervisorResponse:
+    safe_results = [_redact_result(result) for result in results]
     return SupervisorResponse(
         ok=ok,
         mode=mode,  # type: ignore[arg-type]
         action=action,
         status=status,
-        commands=commands,
-        results=results,
+        commands=[_redact_command(command) for command in commands],
+        results=safe_results,
     )
 
 
@@ -254,11 +284,58 @@ def _missing_settings_response(mode: str, action: SupervisorAction, message: str
 
 
 def _check(name: str, ok: bool, command: list[str], result: CommandResult) -> dict[str, object]:
+    safe_result = _redact_result(result)
     return {
         "name": name,
         "ok": ok,
-        "command": command,
-        "returncode": result.returncode,
-        "stdout": result.stdout,
-        "stderr": result.stderr,
+        "command": _redact_command(command),
+        "returncode": safe_result.returncode,
+        "stdout": safe_result.stdout,
+        "stderr": safe_result.stderr,
     }
+
+
+_SECRET_KEY_RE = re.compile(r"(pass(word)?|secret|token|key|credential)", re.IGNORECASE)
+_SECRET_ASSIGNMENT_RE = re.compile(
+    r"(?P<key>[A-Za-z0-9_]*(?:PASS(?:WORD)?|SECRET|TOKEN|KEY|CREDENTIAL)[A-Za-z0-9_]*)=(?P<value>[^\s]+)",
+    re.IGNORECASE,
+)
+_SECRET_URL_RE = re.compile(r"(://[^:/\s]+:)([^@/\s]+)(@)")
+
+
+def _redact_command(command: list[str]) -> list[str]:
+    redacted: list[str] = []
+    redact_next = False
+    for token in command:
+        if redact_next:
+            redacted.append("[redacted]")
+            redact_next = False
+            continue
+        if token in {"--password", "--token", "--secret", "--api-key"}:
+            redacted.append(token)
+            redact_next = True
+            continue
+        redacted.append(_redact_text(token))
+    return redacted
+
+
+def _redact_result(result: CommandResult) -> CommandResult:
+    return result.model_copy(
+        update={
+            "command": _redact_command(result.command),
+            "stdout": _redact_text(result.stdout),
+            "stderr": _redact_text(result.stderr),
+        }
+    )
+
+
+def _redact_text(value: str) -> str:
+    text = _SECRET_URL_RE.sub(r"\1[redacted]\3", value)
+
+    def replace_assignment(match: re.Match[str]) -> str:
+        key = match.group("key")
+        if _SECRET_KEY_RE.search(key):
+            return f"{key}=[redacted]"
+        return match.group(0)
+
+    return _SECRET_ASSIGNMENT_RE.sub(replace_assignment, text)

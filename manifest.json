@@ -215,6 +215,19 @@
       }
     }
   },
+  "requires": {
+    "services": [
+      {
+        "id": "piphi.service.mqtt-broker",
+        "kind": "platform_service",
+        "version_range": ">=0.1.0,<1.0.0",
+        "required": true,
+        "shared": true,
+        "auto_install": true,
+        "reason": "Provides the MQTT broker Zigbee2MQTT uses for device state, availability, and control topics."
+      }
+    ]
+  },
   "api": {
     "required": [
       "health",
@@ -246,7 +259,9 @@
       "bridge_supervisor_restart": "/v1/supervisor/restart",
       "bridge_supervisor_logs": "/v1/supervisor/logs",
       "bridge_prerequisites": "/v1/prerequisites",
-      "bridge_mqtt_check": "/v1/mqtt/check"
+      "bridge_mqtt_check": "/v1/mqtt/check",
+      "bridge_devices": "/v1/devices",
+      "bridge_permit_join": "/v1/permit-join"
     }
   },
   "config": {

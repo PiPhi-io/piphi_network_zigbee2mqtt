@@ -21,5 +21,5 @@ the `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` repository secrets.
 Current image target:
 
 ```text
-piphinetwork/zigbee2mqtt-sidecar:0.1.0
+piphinetwork/zigbee2mqtt-sidecar:0.1.1
 ```

@@ -119,3 +119,34 @@ async def test_prerequisite_checks_report_pm2_availability() -> None:
 
     assert result.ok is True
     assert result.checks[0]["name"] == "pm2_available"
+
+
+@pytest.mark.anyio
+async def test_supervisor_response_redacts_secret_values() -> None:
+    runner = FakeRunner(
+        [
+            CommandResult(command=["docker", "inspect"], returncode=1, stderr="No such object"),
+            CommandResult(
+                command=["docker", "run"],
+                returncode=0,
+                stdout="MQTT_PASSWORD=super-secret mqtt://user:secret@broker.local",
+            ),
+        ]
+    )
+
+    result = await supervise(
+        "start",
+        SupervisorRequest(
+            mode="docker",
+            docker=DockerSupervisorSettings(
+                host_data_path="/var/lib/piphi/zigbee2mqtt",
+                environment={"MQTT_PASSWORD": "super-secret"},
+            ),
+        ),
+        runner=runner,
+    )
+
+    assert result.ok is True
+    assert "MQTT_PASSWORD=[redacted]" in result.commands[1]
+    assert "super-secret" not in result.results[1].stdout
+    assert "mqtt://user:[redacted]@broker.local" in result.results[1].stdout

@@ -54,6 +54,14 @@ async def test_bridge_routes_render_and_snapshot() -> None:
             "/v1/prerequisites",
             json={"mode": "docker", "dry_run": True},
         )
+        devices_response = await client.post(
+            "/v1/devices",
+            json={"dry_run": True},
+        )
+        permit_join_response = await client.post(
+            "/v1/permit-join",
+            json={"dry_run": True, "time": 30, "device": "coordinator"},
+        )
         apply_response = await client.post(
             "/v1/apply",
             json={
@@ -68,6 +76,7 @@ async def test_bridge_routes_render_and_snapshot() -> None:
                 "mqtt_check": {"server": "mqtt://127.0.0.1:1883", "dry_run": True},
             },
         )
+        final_snapshot_response = await client.get("/v1/snapshot")
 
     assert render_response.status_code == 200
     rendered = render_response.json()
@@ -101,8 +110,27 @@ async def test_bridge_routes_render_and_snapshot() -> None:
     assert prerequisites["ok"] is True
     assert prerequisites["checks"][0]["name"] == "docker_available"
 
+    assert devices_response.status_code == 200
+    devices = devices_response.json()
+    assert devices["ok"] is True
+    assert devices["status"] == "planned"
+    assert devices["response_topic"] == "zigbee2mqtt/bridge/devices"
+
+    assert permit_join_response.status_code == 200
+    permit_join = permit_join_response.json()
+    assert permit_join["ok"] is True
+    assert permit_join["status"] == "planned"
+    assert permit_join["time"] == 30
+    assert permit_join["device"] == "coordinator"
+    assert permit_join["request_topic"] == "zigbee2mqtt/bridge/request/permit_join"
+
     assert apply_response.status_code == 200
     applied = apply_response.json()
     assert applied["ok"] is True
     assert applied["restart_required"] is False
     assert applied["write"]["config_hash"].startswith("sha256:")
+
+    assert final_snapshot_response.status_code == 200
+    final_snapshot = final_snapshot_response.json()
+    assert final_snapshot["devices"]["status"] == "planned"
+    assert final_snapshot["permit_join"]["status"] == "planned"
