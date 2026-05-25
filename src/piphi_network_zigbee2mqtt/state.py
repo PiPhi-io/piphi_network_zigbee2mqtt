@@ -11,7 +11,8 @@ from piphi_runtime_kit_python import (
 )
 
 from .contract import CAPABILITIES, COMMANDS
-from .bridge_models import SidecarStore
+from .bridge_models import MqttSettings, SerialSettings, SidecarStore, Zigbee2MqttBridgeConfig
+from .config_renderer import render_zigbee2mqtt_config
 from .schemas import DeviceConfig
 from .settings import INTEGRATION_ID, INTEGRATION_NAME, INTEGRATION_VERSION
 
@@ -81,6 +82,15 @@ async def apply_config(config: DeviceConfig) -> None:
         entry,
         {"host": config.host, "alias": config.alias},
     )
+    if config.serial_port:
+        bridge_config = Zigbee2MqttBridgeConfig(
+            mqtt=MqttSettings(server=config.mqtt_server, base_topic=config.mqtt_base_topic),
+            serial=SerialSettings(port=config.serial_port, adapter=config.adapter),
+            data_path=config.data_path,
+        )
+        sidecar_store.current_config = bridge_config
+        sidecar_store.current_render = render_zigbee2mqtt_config(bridge_config)
+        sidecar_store.last_error = None
 
 
 async def remove_config(config_id: str) -> bool:
