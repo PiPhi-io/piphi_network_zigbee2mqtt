@@ -60,7 +60,9 @@ def _candidate_from_port(port) -> AdapterCandidate:
 def infer_adapter_hint(text: str) -> tuple[str | None, float]:
     normalized = text.lower()
     rules: list[tuple[tuple[str, ...], str, float]] = [
+        (("zbdongle-e", "dongle-e", "sonoff dongle-e"), "ember", 0.94),
         (("zbdongle-p", "cc2652", "cc1352", "cc2531", "slae.sh cc2652", "tube_zb cc2652"), "zstack", 0.92),
+        (("sonoff zigbee 3.0 usb dongle plus", "itead sonoff zigbee 3.0 usb dongle plus"), "zstack", 0.88),
         (("zbdongle-e", "skyconnect", "home assistant connect zbt-1", "efr32", "mgm21", "ember"), "ember", 0.9),
         (("conbee", "raspbee", "dresden elektronik"), "deconz", 0.86),
         (("zigate",), "zigate", 0.86),
