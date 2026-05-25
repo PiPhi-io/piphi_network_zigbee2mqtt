@@ -76,24 +76,32 @@ CONFIG_SCHEMA: dict[str, Any] = {
         "properties": {
             "serial_port": {
                 "type": "string",
-                "title": "Coordinator Port"
+                "title": "Coordinator Port",
+                "description": "USB/serial path for the Zigbee coordinator. PiPhi will prefill this when it can detect the adapter."
             },
             "adapter": {
                 "type": "string",
                 "title": "Adapter Type",
+                "description": "Leave blank only if Zigbee2MQTT can auto-detect your coordinator adapter.",
                 "enum": ["zstack", "ember", "deconz", "zigate", "zboss"]
             },
             "mqtt_server": {
                 "type": "string",
-                "title": "MQTT Server"
+                "title": "MQTT Server",
+                "default": "mqtt://127.0.0.1:1883",
+                "description": "MQTT broker URL used by Zigbee2MQTT. PiPhi preselects the required MQTT Broker sidecar when it is installed."
             },
             "mqtt_base_topic": {
                 "type": "string",
-                "title": "MQTT Base Topic"
+                "title": "MQTT Base Topic",
+                "default": "zigbee2mqtt",
+                "description": "Root MQTT topic Zigbee2MQTT uses for bridge and device messages."
             },
             "data_path": {
                 "type": "string",
-                "title": "Zigbee2MQTT Data Path"
+                "title": "Zigbee2MQTT Data Path",
+                "default": "/app/data",
+                "description": "Path inside the sidecar container where Zigbee2MQTT configuration and state are written."
             }
         }
     },
