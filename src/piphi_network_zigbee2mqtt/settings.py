@@ -4,7 +4,7 @@ import os
 
 INTEGRATION_ID = "piphi.service.zigbee2mqtt-sidecar"
 INTEGRATION_NAME = "Zigbee2MQTT Sidecar"
-INTEGRATION_VERSION = "0.1.0"
+INTEGRATION_VERSION = "0.1.5"
 PROJECT_KIND = "sidecar"
 PROJECT_PRESET = "platform-service"
 PROJECT_DOMAIN = "sidecar-service"

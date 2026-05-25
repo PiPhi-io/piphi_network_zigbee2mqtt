@@ -13,6 +13,7 @@ from piphi_runtime_kit_python import (
 from .contract import CAPABILITIES, COMMANDS
 from .bridge_models import MqttSettings, SerialSettings, SidecarStore, Zigbee2MqttBridgeConfig
 from .config_renderer import render_zigbee2mqtt_config
+from .config_store import write_config_atomic
 from .schemas import DeviceConfig
 from .settings import INTEGRATION_ID, INTEGRATION_NAME, INTEGRATION_VERSION
 
@@ -88,8 +89,20 @@ async def apply_config(config: DeviceConfig) -> None:
             serial=SerialSettings(port=config.serial_port, adapter=config.adapter),
             data_path=config.data_path,
         )
+        rendered = render_zigbee2mqtt_config(bridge_config)
+        target_path = f"{bridge_config.data_path.rstrip('/')}/configuration.yaml"
+        try:
+            write_result = write_config_atomic(rendered.yaml, target_path)
+        except OSError as exc:
+            sidecar_store.last_error = f"Could not write Zigbee2MQTT configuration: {exc}"
+            raise HTTPException(status_code=500, detail=sidecar_store.last_error) from exc
+
+        rendered.config_path = write_result.config_path
+        rendered.config_hash = write_result.config_hash
         sidecar_store.current_config = bridge_config
-        sidecar_store.current_render = render_zigbee2mqtt_config(bridge_config)
+        sidecar_store.current_render = rendered
+        sidecar_store.config_path = write_result.config_path
+        sidecar_store.config_hash = write_result.config_hash
         sidecar_store.last_error = None
 
 
