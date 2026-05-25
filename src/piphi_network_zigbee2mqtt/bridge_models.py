@@ -249,7 +249,7 @@ class DeviceListResponse(BaseModel):
 
 class PermitJoinRequest(Zigbee2MqttApiRequest):
     value: bool = True
-    time: int = Field(default=60, ge=1, le=3600)
+    time: int = Field(default=60, ge=1, le=254)
     device: str | None = None
 
 
