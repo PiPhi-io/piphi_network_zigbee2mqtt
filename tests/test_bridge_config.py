@@ -35,3 +35,38 @@ def test_render_zigbee2mqtt_configuration_yaml() -> None:
     assert 'adapter: "ember"' in rendered.yaml
     assert "availability: true" in rendered.yaml
     assert "frontend:" in rendered.yaml
+
+
+def test_render_zigbee2mqtt_configuration_extracts_url_credentials() -> None:
+    rendered = render_zigbee2mqtt_config(
+        Zigbee2MqttBridgeConfig(
+            mqtt=MqttSettings(
+                server="mqtt://z2m:secret@broker.local:1883",
+                base_topic="zigbee2mqtt",
+            ),
+            serial=SerialSettings(port="/dev/ttyZigbee"),
+        )
+    )
+
+    assert 'server: "mqtt://broker.local:1883"' in rendered.yaml
+    assert 'user: "z2m"' in rendered.yaml
+    assert 'password: "secret"' in rendered.yaml
+    assert "z2m:secret@" not in rendered.yaml
+
+
+def test_render_zigbee2mqtt_configuration_prefers_explicit_credentials() -> None:
+    rendered = render_zigbee2mqtt_config(
+        Zigbee2MqttBridgeConfig(
+            mqtt=MqttSettings(
+                server="mqtt://url-user:url-pass@broker.local:1883",
+                user="explicit-user",
+                password="explicit-pass",
+            ),
+            serial=SerialSettings(port="/dev/ttyZigbee"),
+        )
+    )
+
+    assert 'server: "mqtt://broker.local:1883"' in rendered.yaml
+    assert 'user: "explicit-user"' in rendered.yaml
+    assert 'password: "explicit-pass"' in rendered.yaml
+    assert "url-user:url-pass@" not in rendered.yaml

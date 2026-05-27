@@ -48,7 +48,10 @@ async def test_apply_config_writes_zigbee2mqtt_configuration(tmp_path) -> None:
 
     config_path = tmp_path / "configuration.yaml"
     yaml = config_path.read_text(encoding="utf-8")
-    assert 'server: "mqtt://user:pass@127.0.0.1:1883"' in yaml
+    assert 'server: "mqtt://127.0.0.1:1883"' in yaml
+    assert 'user: "user"' in yaml
+    assert 'password: "pass"' in yaml
+    assert "user:pass@" not in yaml
     assert 'port: "/dev/ttyUSB0"' in yaml
     assert sidecar_store.config_path == str(config_path)
     assert sidecar_store.config_hash

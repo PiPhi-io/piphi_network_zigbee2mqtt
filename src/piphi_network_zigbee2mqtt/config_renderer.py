@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import unquote, urlparse, urlunparse
 
-from .bridge_models import RenderedBridgeConfig, Zigbee2MqttBridgeConfig
+from .bridge_models import MqttSettings, RenderedBridgeConfig, Zigbee2MqttBridgeConfig
 from .config_store import text_sha256
 
 
@@ -10,10 +11,7 @@ def render_zigbee2mqtt_config(config: Zigbee2MqttBridgeConfig) -> RenderedBridge
     payload: dict[str, Any] = {
         "homeassistant": config.homeassistant,
         "permit_join": config.permit_join,
-        "mqtt": {
-            "base_topic": config.mqtt.base_topic,
-            "server": config.mqtt.server,
-        },
+        "mqtt": _render_mqtt_settings(config.mqtt),
         "serial": {
             "port": config.serial.port,
         },
@@ -23,10 +21,6 @@ def render_zigbee2mqtt_config(config: Zigbee2MqttBridgeConfig) -> RenderedBridge
         },
         "availability": config.availability,
     }
-    if config.mqtt.user:
-        payload["mqtt"]["user"] = config.mqtt.user
-    if config.mqtt.password:
-        payload["mqtt"]["password"] = config.mqtt.password
     if config.serial.adapter:
         payload["serial"]["adapter"] = config.serial.adapter
     if config.serial.baudrate:
@@ -45,6 +39,50 @@ def render_zigbee2mqtt_config(config: Zigbee2MqttBridgeConfig) -> RenderedBridge
         runtime=config.runtime,
         config_hash=text_sha256(yaml),
     )
+
+
+def _render_mqtt_settings(settings: MqttSettings) -> dict[str, Any]:
+    server, url_user, url_password = _split_mqtt_server_credentials(settings.server)
+    payload: dict[str, Any] = {
+        "base_topic": settings.base_topic,
+        "server": server,
+    }
+    user = settings.user or url_user
+    password = settings.password or url_password
+    if user:
+        payload["user"] = user
+    if password:
+        payload["password"] = password
+    return payload
+
+
+def _split_mqtt_server_credentials(server: str) -> tuple[str, str | None, str | None]:
+    text = str(server or "").strip()
+    parsed = urlparse(text if "://" in text else f"mqtt://{text}")
+    username = unquote(parsed.username) if parsed.username else None
+    password = unquote(parsed.password) if parsed.password else None
+    if not username and not password:
+        return text, None, None
+
+    host = parsed.hostname or ""
+    if ":" in host and not host.startswith("["):
+        host = f"[{host}]"
+    try:
+        port = parsed.port
+    except ValueError:
+        port = None
+    netloc = f"{host}:{port}" if port else host
+    clean_server = urlunparse(
+        (
+            parsed.scheme or "mqtt",
+            netloc,
+            parsed.path,
+            parsed.params,
+            parsed.query,
+            parsed.fragment,
+        )
+    )
+    return clean_server, username, password
 
 
 def _render_yaml(value: Any, indent: int = 0) -> str:
