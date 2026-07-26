@@ -28,5 +28,17 @@
       ]
     }
   ],
-  "templates": []
+  "templates": [],
+  "telemetry": {
+    "capabilityMappings": [
+      {
+        "nativeMetric": "connected",
+        "capability": "sensor.connected"
+      },
+      {
+        "nativeMetric": "temperature_c",
+        "capability": "sensor.temperature_c"
+      }
+    ]
+  }
 }
