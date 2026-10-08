@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, Query
+from piphi_runtime_kit_python import RuntimeStateService
 
 from ..contract import ENDPOINTS, REQUIRED_ENDPOINTS
 from ..settings import (
@@ -16,11 +17,23 @@ from ..settings import (
 from ..state import registry, sidecar_store
 
 router = APIRouter(tags=["runtime"])
+state_service = RuntimeStateService(registry)
 
 
 @router.get("/state")
-async def state() -> dict[str, Any]:
+async def state(
+    refresh: bool = Query(default=False),
+    refresh_request_id: str | None = Query(default=None),
+) -> dict[str, Any]:
+    try:
+        state_payload = await state_service.response(
+            refresh=refresh,
+            refresh_request_id=refresh_request_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {
+        **state_payload,
         "summary": {
             "active_config_count": len(registry.ids()),
             "recent_event_count": len(registry.recent_events),
