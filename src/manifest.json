@@ -369,5 +369,8 @@
         "default_widget": "tile"
       }
     }
-  ]
+  ],
+  "onboarding": {
+    "mode": "service"
+  }
 }
