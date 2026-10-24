@@ -62,13 +62,11 @@
         "image": "piphinetwork/zigbee2mqtt-sidecar:0.1.12",
         "ports": [
           {
-            "container": 8720,
-            "host": 8720
+            "container": 8720
           }
         ],
         "environment": {
           "LOG_LEVEL": "info",
-          "PORT": "8720",
           "ZIGBEE2MQTT_BRIDGE_CONTAINER": "piphi-zigbee2mqtt",
           "ZIGBEE2MQTT_BRIDGE_IMAGE": "ghcr.io/koenkk/zigbee2mqtt:latest",
           "ZIGBEE2MQTT_CONTAINER_DATA_PATH": "/app/data",
@@ -372,5 +370,10 @@
   ],
   "onboarding": {
     "mode": "service"
+  },
+  "runtime_contract": {
+    "version": 1,
+    "port_binding": "core_allocated",
+    "port_env": "PORT"
   }
 }
