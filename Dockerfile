@@ -7,4 +7,4 @@ COPY src ./src
 COPY --from=docker-cli /usr/local/bin/docker /usr/local/bin/docker
 RUN pip install --no-cache-dir .
 EXPOSE 8720
-CMD ["uvicorn", "piphi_network_zigbee2mqtt.main:app", "--host", "0.0.0.0", "--port", "8720"]
+CMD ["python", "-m", "piphi_network_zigbee2mqtt.main"]
