@@ -8,6 +8,7 @@ from ..bridge_models import (
     ApplyBridgeResponse,
     DeviceListRequest,
     MqttCheckRequest,
+    NetworkMapRequest,
     PermitJoinRequest,
     PrerequisiteCheckRequest,
     SupervisorLogsRequest,
@@ -62,6 +63,34 @@ async def devices(payload: DeviceListRequest | None = None):
 @router.get("/devices")
 async def devices_get():
     return await devices(DeviceListRequest())
+
+
+@router.post("/network-map")
+async def network_map(payload: NetworkMapRequest | None = None):
+    request = payload or NetworkMapRequest()
+    try:
+        mqtt_settings = resolve_mqtt_settings(
+            current=sidecar_store.current_config.mqtt if sidecar_store.current_config else None,
+            server=request.server,
+            base_topic=request.base_topic,
+        )
+        result = await Zigbee2MqttMqttClient(
+            mqtt=mqtt_settings,
+            timeout_seconds=request.timeout_seconds,
+        ).network_map(routes=request.routes, dry_run=request.dry_run)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Zigbee2MqttMqttError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    sidecar_store.last_network_map = result
+    return result
+
+
+@router.get("/network-map")
+async def network_map_get():
+    if sidecar_store.last_network_map is None:
+        raise HTTPException(status_code=404, detail="No Zigbee network map has been scanned yet.")
+    return sidecar_store.last_network_map
 
 
 @router.post("/permit-join")

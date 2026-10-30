@@ -53,6 +53,8 @@ Bridge-specific routes:
 - `POST /v1/mqtt/check`
 - `POST /v1/devices`
 - `GET /v1/devices`
+- `POST /v1/network-map`
+- `GET /v1/network-map`
 - `POST /v1/permit-join`
 
 ## Render a Zigbee2MQTT Config
@@ -158,6 +160,15 @@ curl -s http://127.0.0.1:8720/v1/devices \
     "server": "mqtt://127.0.0.1:1883",
     "base_topic": "zigbee2mqtt"
   }'
+```
+
+Scan the Zigbee mesh manually (the scan can make the network less responsive
+for up to two minutes, so it is never scheduled automatically):
+
+```bash
+curl -s http://127.0.0.1:8720/v1/network-map \
+  -H 'content-type: application/json' \
+  -d '{"routes": false}'
 ```
 
 Open pairing for 60 seconds:

@@ -72,6 +72,11 @@ async def apply_config(config: DeviceConfig) -> None:
         config.id,
         {
             "connected": True,
+            "zigbee_network_topology": (
+                sidecar_store.last_network_map.model_dump(mode="json", exclude={"server"})
+                if sidecar_store.last_network_map
+                else None
+            ),
             "host": config.host,
             "alias": config.alias,
             "config_id": entry["config_id"],

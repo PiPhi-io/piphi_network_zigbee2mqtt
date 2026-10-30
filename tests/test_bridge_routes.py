@@ -58,6 +58,10 @@ async def test_bridge_routes_render_and_snapshot() -> None:
             "/v1/devices",
             json={"dry_run": True},
         )
+        network_map_response = await client.post(
+            "/v1/network-map",
+            json={"dry_run": True, "routes": False},
+        )
         permit_join_response = await client.post(
             "/v1/permit-join",
             json={"dry_run": True, "time": 30, "device": "coordinator"},
@@ -124,6 +128,13 @@ async def test_bridge_routes_render_and_snapshot() -> None:
     assert permit_join["device"] == "coordinator"
     assert permit_join["request_topic"] == "zigbee2mqtt/bridge/request/permit_join"
 
+    assert network_map_response.status_code == 200
+    network_map = network_map_response.json()
+    assert network_map["ok"] is True
+    assert network_map["status"] == "planned"
+    assert network_map["request_topic"] == "zigbee2mqtt/bridge/request/networkmap"
+    assert network_map["routes_included"] is False
+
     assert apply_response.status_code == 200
     applied = apply_response.json()
     assert applied["ok"] is True
@@ -133,4 +144,5 @@ async def test_bridge_routes_render_and_snapshot() -> None:
     assert final_snapshot_response.status_code == 200
     final_snapshot = final_snapshot_response.json()
     assert final_snapshot["devices"]["status"] == "planned"
+    assert final_snapshot["network_map"]["status"] == "planned"
     assert final_snapshot["permit_join"]["status"] == "planned"

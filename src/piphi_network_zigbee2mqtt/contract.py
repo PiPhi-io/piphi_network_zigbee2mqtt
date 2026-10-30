@@ -26,6 +26,7 @@ ENDPOINTS = {
     "bridge_supervisor_logs": "/v1/supervisor/logs",
     "bridge_prerequisites": "/v1/prerequisites",
     "bridge_mqtt_check": "/v1/mqtt/check",
+    "bridge_network_map": "/v1/network-map",
 }
 
 REQUIRED_ENDPOINTS = ["health", "entities", "command", "config", "ui_config"]
@@ -52,6 +53,13 @@ CAPABILITIES: dict[str, dict[str, Any]] = {
     },
     "render_config": {
         "kind": "action"
+    },
+    "zigbee_network_topology": {
+        "kind": "sensor",
+        "unit": "json"
+    },
+    "refresh_network_map": {
+        "kind": "action"
     }
 }
 
@@ -63,6 +71,10 @@ COMMANDS: dict[str, dict[str, Any]] = {
     "render_config": {
         "description": "Render or write Zigbee2MQTT configuration.yaml.",
         "timeout_ms": 10000
+    },
+    "refresh_network_map": {
+        "description": "Manually scan the Zigbee mesh and refresh its network topology.",
+        "timeout_ms": 130000
     }
 }
 
@@ -135,7 +147,9 @@ FALLBACK_ENTITY: dict[str, Any] = {
         "service_available",
         "bridge_configured",
         "adapter_detected",
-        "render_config"
+        "render_config",
+        "zigbee_network_topology",
+        "refresh_network_map"
     ],
     "available_commands": [
         {
@@ -147,13 +161,19 @@ FALLBACK_ENTITY: dict[str, Any] = {
             "id": "render_config",
             "label": "Render Config",
             "kind": "action"
+        },
+        {
+            "id": "refresh_network_map",
+            "label": "Scan Network Map",
+            "kind": "action"
         }
     ],
     "dashboard": {
         "allowed_widgets": [
             "tile",
             "stat",
-            "button"
+            "button",
+            "io.piphi.zigbee2mqtt-network-map"
         ],
         "default_widget": "tile"
     }

@@ -61,11 +61,48 @@ class FakeMqttModule:
         def publish(self, topic: str, payload: str) -> None:
             self.published.append((topic, payload))
             request = json.loads(payload)
-            response = {
-                "status": "ok",
-                "data": {"time": request["time"]},
-                "transaction": request["transaction"],
-            }
+            if topic.endswith("/networkmap"):
+                response = {
+                    "status": "ok",
+                    "data": {
+                        "value": {
+                            "nodes": [
+                                {
+                                    "ieeeAddr": "0x0000",
+                                    "friendlyName": "Coordinator",
+                                    "type": "Coordinator",
+                                    "networkAddress": 0,
+                                },
+                                {
+                                    "ieeeAddr": "0x1111",
+                                    "friendlyName": "Hall router",
+                                    "type": "Router",
+                                    "networkAddress": 42,
+                                    "manufacturerName": "Example",
+                                    "modelID": "Router 1",
+                                },
+                            ],
+                            "links": [
+                                {
+                                    "source": {"ieeeAddr": "0x0000"},
+                                    "target": {"networkAddress": 42},
+                                    "linkquality": 210,
+                                    "depth": 1,
+                                    "routes": [42],
+                                }
+                            ],
+                        },
+                        "type": "raw",
+                        "routes": request["routes"],
+                    },
+                    "transaction": request["transaction"],
+                }
+            else:
+                response = {
+                    "status": "ok",
+                    "data": {"time": request["time"]},
+                    "transaction": request["transaction"],
+                }
             self.on_message(self, None, SimpleNamespace(payload=json.dumps(response).encode("utf-8")))
 
 
@@ -115,3 +152,26 @@ async def test_permit_join_uses_request_response_transaction() -> None:
     assert decoded["time"] == 45
     assert decoded["device"] == "coordinator"
     assert decoded["transaction"] == result.transaction
+
+
+@pytest.mark.anyio
+async def test_network_map_requests_raw_topology_and_normalizes_nodes_and_links() -> None:
+    FakeMqttModule.instances.clear()
+    client = Zigbee2MqttMqttClient(
+        mqtt=MqttSettings(server="mqtt://broker.local:1883", base_topic="home/zigbee"),
+        mqtt_module=FakeMqttModule,
+    )
+
+    result = await client.network_map(routes=True)
+
+    assert result.ok is True
+    assert result.routes_included is True
+    assert [node.id for node in result.nodes] == ["0x0000", "0x1111"]
+    assert result.nodes[1].manufacturer == "Example"
+    assert result.links[0].source == "0x0000"
+    assert result.links[0].target == "0x1111"
+    assert result.links[0].link_quality == 210
+    assert result.links[0].routes == [42]
+    topic, payload = FakeMqttModule.instances[0].published[0]
+    assert topic == "home/zigbee/bridge/request/networkmap"
+    assert json.loads(payload)["type"] == "raw"
