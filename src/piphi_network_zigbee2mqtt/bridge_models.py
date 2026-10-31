@@ -247,6 +247,43 @@ class DeviceListResponse(BaseModel):
     raw: Any | None = None
 
 
+class NetworkMapNode(BaseModel):
+    id: str
+    friendly_name: str
+    type: str
+    ieee_address: str | None = None
+    network_address: int | None = None
+    manufacturer: str | None = None
+    model: str | None = None
+
+
+class NetworkMapLink(BaseModel):
+    source: str
+    target: str
+    link_quality: int | None = Field(default=None, ge=0, le=255)
+    depth: int | None = Field(default=None, ge=0)
+    routes: list[int] = Field(default_factory=list)
+
+
+class NetworkMapRequest(Zigbee2MqttApiRequest):
+    routes: bool = False
+
+
+class NetworkMapResponse(BaseModel):
+    ok: bool
+    status: str
+    nodes: list[NetworkMapNode] = Field(default_factory=list)
+    links: list[NetworkMapLink] = Field(default_factory=list)
+    routes_included: bool = False
+    collected_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    server: str
+    base_topic: str
+    request_topic: str
+    response_topic: str
+    transaction: str | None = None
+    message: str | None = None
+
+
 class PermitJoinRequest(Zigbee2MqttApiRequest):
     value: bool = True
     time: int = Field(default=60, ge=1, le=254)
@@ -294,6 +331,7 @@ class SidecarStore:
         self.last_supervisor: SupervisorResponse | None = None
         self.last_mqtt_check: MqttCheckResponse | None = None
         self.last_devices: DeviceListResponse | None = None
+        self.last_network_map: NetworkMapResponse | None = None
         self.last_permit_join: PermitJoinResponse | None = None
 
     def snapshot(self) -> BridgeSnapshot:
@@ -314,6 +352,7 @@ class SidecarStore:
             supervisor=self.last_supervisor.model_dump(mode="json") if self.last_supervisor else None,
             mqtt_check=self.last_mqtt_check.model_dump(mode="json") if self.last_mqtt_check else None,
             devices=self.last_devices.model_dump(mode="json") if self.last_devices else None,
+            network_map=self.last_network_map.model_dump(mode="json") if self.last_network_map else None,
             permit_join=self.last_permit_join.model_dump(mode="json") if self.last_permit_join else None,
         )
 

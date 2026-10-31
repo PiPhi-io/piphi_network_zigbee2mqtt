@@ -16,7 +16,8 @@ from piphi_runtime_kit_python.fastapi import (
     sync_runtime_auth_from_fastapi_request,
 )
 
-from ..state import append_runtime_event, commands, registry, runtime
+from ..state import append_runtime_event, commands, registry, runtime, sidecar_store
+from ..zigbee2mqtt_mqtt import Zigbee2MqttMqttClient, resolve_mqtt_settings
 
 router = APIRouter(tags=["commands"])
 _ledger_path = Path(
@@ -41,6 +42,32 @@ async def _execute_registered_command(
         "device_id": device_id,
         "config_id": config_id,
     }
+    if action_request.command == "refresh_network_map":
+        entry_config = entry.get("config") if isinstance(entry.get("config"), dict) else {}
+        mqtt_settings = resolve_mqtt_settings(
+            current=sidecar_store.current_config.mqtt if sidecar_store.current_config else None,
+            server=entry_config.get("mqtt_server"),
+            base_topic=entry_config.get("mqtt_base_topic"),
+        )
+        routes = bool(action_request.args.get("routes", False))
+        topology = await Zigbee2MqttMqttClient(
+            mqtt=mqtt_settings,
+            timeout_seconds=125.0,
+        ).network_map(routes=routes)
+        sidecar_store.last_network_map = topology
+        topology_state = topology.model_dump(mode="json", exclude={"server"})
+        registry.update_state(
+            config_id,
+            {"connected": True, "zigbee_network_topology": topology_state},
+            device_id=device_id,
+        )
+        return {
+            "ok": topology.ok,
+            "command": action_request.command,
+            "config_id": config_id,
+            "device_id": device_id,
+            "topology": topology_state,
+        }
     event = append_runtime_event(
         "runtime.command.received",
         entry,
@@ -92,7 +119,7 @@ async def command(payload: dict[str, Any], request: Request):
         (
             capability
             for capability in requested_capabilities
-            if capability not in {"device.refresh", f"action.{command_name}"}
+            if capability not in {"device.refresh", "zigbee_network_topology", f"action.{command_name}"}
         ),
         None,
     )

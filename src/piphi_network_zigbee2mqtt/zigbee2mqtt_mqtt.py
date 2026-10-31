@@ -10,6 +10,9 @@ from urllib.parse import unquote, urlparse
 from .bridge_models import (
     DeviceListResponse,
     MqttSettings,
+    NetworkMapLink,
+    NetworkMapNode,
+    NetworkMapResponse,
     PermitJoinResponse,
     Zigbee2MqttDevice,
 )
@@ -98,6 +101,39 @@ class Zigbee2MqttMqttClient:
             transaction=_response_transaction(raw),
             message=_response_message(raw),
             raw=raw,
+        )
+
+    async def network_map(self, *, routes: bool = False, dry_run: bool = False) -> NetworkMapResponse:
+        request_topic = f"{self.mqtt.base_topic}/bridge/request/networkmap"
+        response_topic = f"{self.mqtt.base_topic}/bridge/response/networkmap"
+        if dry_run:
+            return NetworkMapResponse(
+                ok=True,
+                status="planned",
+                routes_included=routes,
+                server=self.mqtt.server,
+                base_topic=self.mqtt.base_topic,
+                request_topic=request_topic,
+                response_topic=response_topic,
+            )
+        raw = await self._request_response(
+            request_topic=request_topic,
+            response_topic=response_topic,
+            payload={"type": "raw", "routes": routes},
+        )
+        nodes, links = _extract_network_map(raw)
+        return NetworkMapResponse(
+            ok=_response_ok(raw),
+            status=str(raw.get("status") or "ok"),
+            nodes=nodes,
+            links=links,
+            routes_included=routes,
+            server=self.mqtt.server,
+            base_topic=self.mqtt.base_topic,
+            request_topic=request_topic,
+            response_topic=response_topic,
+            transaction=_response_transaction(raw),
+            message=_response_message(raw),
         )
 
     async def _request_response(
@@ -324,6 +360,93 @@ def _extract_devices(raw: Any) -> list[Zigbee2MqttDevice]:
         for item in candidate
         if isinstance(item, dict) and item.get("friendly_name")
     ]
+
+
+def _extract_network_map(raw: dict[str, Any]) -> tuple[list[NetworkMapNode], list[NetworkMapLink]]:
+    data = raw.get("data") if isinstance(raw, dict) else None
+    value = data.get("value") if isinstance(data, dict) else None
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except (TypeError, ValueError) as exc:
+            raise Zigbee2MqttMqttError("Zigbee2MQTT returned an invalid raw network map.") from exc
+    if not isinstance(value, dict):
+        raise Zigbee2MqttMqttError("Zigbee2MQTT returned no raw network map.")
+
+    raw_nodes = value.get("nodes")
+    raw_links = value.get("links")
+    if not isinstance(raw_nodes, list) or not isinstance(raw_links, list):
+        raise Zigbee2MqttMqttError("Zigbee2MQTT returned an unexpected network map shape.")
+    if len(raw_nodes) > 500 or len(raw_links) > 4000:
+        raise Zigbee2MqttMqttError("Zigbee2MQTT network map exceeds PiPhi safety limits.")
+
+    nodes: list[NetworkMapNode] = []
+    aliases: dict[str, str] = {}
+    for index, item in enumerate(raw_nodes):
+        if not isinstance(item, dict):
+            continue
+        ieee = _bounded_text(item.get("ieeeAddr") or item.get("ieee_address"))
+        network_address = _bounded_int(item.get("networkAddress") or item.get("network_address"), 0, 65535)
+        node_id = ieee or (str(network_address) if network_address is not None else f"node-{index}")
+        friendly_name = _bounded_text(item.get("friendlyName") or item.get("friendly_name")) or node_id
+        node = NetworkMapNode(
+            id=node_id,
+            friendly_name=friendly_name,
+            type=_bounded_text(item.get("type")) or "Unknown",
+            ieee_address=ieee,
+            network_address=network_address,
+            manufacturer=_bounded_text(item.get("manufacturerName") or item.get("manufacturer")),
+            model=_bounded_text(item.get("modelID") or item.get("model")),
+        )
+        nodes.append(node)
+        for alias in (node_id, ieee, friendly_name, str(network_address) if network_address is not None else None):
+            if alias:
+                aliases[str(alias)] = node_id
+
+    links: list[NetworkMapLink] = []
+    for item in raw_links:
+        if not isinstance(item, dict):
+            continue
+        source = _network_map_endpoint(item.get("source"), aliases)
+        target = _network_map_endpoint(item.get("target"), aliases)
+        if not source or not target:
+            continue
+        raw_routes = item.get("routes") if isinstance(item.get("routes"), list) else []
+        routes = [route for route in (_bounded_int(value, 0, 65535) for value in raw_routes[:128]) if route is not None]
+        links.append(
+            NetworkMapLink(
+                source=source,
+                target=target,
+                link_quality=_bounded_int(item.get("linkquality") or item.get("linkQuality"), 0, 255),
+                depth=_bounded_int(item.get("depth"), 0, 255),
+                routes=routes,
+            )
+        )
+    return nodes, links
+
+
+def _network_map_endpoint(value: Any, aliases: dict[str, str]) -> str | None:
+    if isinstance(value, dict):
+        value = value.get("ieeeAddr") or value.get("ieee_address") or value.get("id") or value.get("networkAddress")
+    token = _bounded_text(value)
+    return aliases.get(token, token) if token else None
+
+
+def _bounded_text(value: Any, limit: int = 256) -> str | None:
+    if value is None:
+        return None
+    token = str(value).replace("\x00", "").strip()
+    return token[:limit] or None
+
+
+def _bounded_int(value: Any, minimum: int, maximum: int) -> int | None:
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if minimum <= parsed <= maximum else None
 
 
 def _response_ok(raw: dict[str, Any]) -> bool:
