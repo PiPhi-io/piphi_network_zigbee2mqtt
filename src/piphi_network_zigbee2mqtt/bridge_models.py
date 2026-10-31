@@ -3,8 +3,9 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
+from urllib.parse import urlsplit, urlunsplit
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator, model_validator
 
 
 AdapterTransport = Literal["serial", "tcp", "socket"]
@@ -122,6 +123,10 @@ class BridgeSnapshot(BaseModel):
     supervisor: dict[str, Any] | None = None
     mqtt_check: dict[str, Any] | None = None
 
+    @field_serializer("mqtt_server")
+    def serialize_mqtt_server(self, value: str | None) -> str | None:
+        return redact_mqtt_server(value)
+
 
 class CommandResult(BaseModel):
     command: list[str]
@@ -198,6 +203,10 @@ class MqttCheckResponse(BaseModel):
     status: str
     message: str | None = None
 
+    @field_serializer("server")
+    def serialize_server(self, value: str) -> str:
+        return redact_mqtt_server(value) or ""
+
 
 class Zigbee2MqttApiRequest(BaseModel):
     server: str | None = None
@@ -222,12 +231,34 @@ class Zigbee2MqttDevice(BaseModel):
     friendly_name: str
     ieee_address: str | None = None
     type: str | None = None
+    interview_state: str | None = None
+    # Deprecated fields remain input-compatible with older retained payloads.
     interview_completed: bool | None = None
     interviewing: bool | None = None
     supported: bool | None = None
     definition: dict[str, Any] | None = None
     power_source: str | None = None
     date_code: str | None = None
+    import_eligible: bool = True
+    import_blocked_reason: str | None = None
+
+    @model_validator(mode="after")
+    def derive_import_eligibility(self) -> "Zigbee2MqttDevice":
+        state = str(self.interview_state or "").strip().lower()
+        device_type = str(self.type or "").strip().lower()
+        if device_type == "coordinator":
+            self.import_eligible = False
+            self.import_blocked_reason = "coordinator"
+        elif self.supported is False:
+            self.import_eligible = False
+            self.import_blocked_reason = "unsupported"
+        elif state in {"failed", "interview_failed"}:
+            self.import_eligible = False
+            self.import_blocked_reason = "interview_failed"
+        elif state in {"pending", "started", "interviewing"}:
+            self.import_eligible = False
+            self.import_blocked_reason = "interview_in_progress"
+        return self
 
 
 class DeviceListRequest(Zigbee2MqttApiRequest):
@@ -245,6 +276,10 @@ class DeviceListResponse(BaseModel):
     transaction: str | None = None
     message: str | None = None
     raw: Any | None = None
+
+    @field_serializer("server")
+    def serialize_server(self, value: str) -> str:
+        return redact_mqtt_server(value) or ""
 
 
 class NetworkMapNode(BaseModel):
@@ -283,6 +318,10 @@ class NetworkMapResponse(BaseModel):
     transaction: str | None = None
     message: str | None = None
 
+    @field_serializer("server")
+    def serialize_server(self, value: str) -> str:
+        return redact_mqtt_server(value) or ""
+
 
 class PermitJoinRequest(Zigbee2MqttApiRequest):
     value: bool = True
@@ -303,6 +342,10 @@ class PermitJoinResponse(BaseModel):
     transaction: str | None = None
     message: str | None = None
     raw: Any | None = None
+
+    @field_serializer("server")
+    def serialize_server(self, value: str) -> str:
+        return redact_mqtt_server(value) or ""
 
 
 class ApplyBridgeRequest(WriteConfigRequest):
@@ -361,3 +404,19 @@ def ensure_parent_directory(path: str) -> Path:
     target = Path(path).expanduser()
     target.parent.mkdir(parents=True, exist_ok=True)
     return target
+
+
+def redact_mqtt_server(value: str | None) -> str | None:
+    """Return a browser-safe MQTT endpoint with user-info removed."""
+    token = str(value or "").strip()
+    if not token:
+        return None
+    has_scheme = "://" in token
+    parsed = urlsplit(token if has_scheme else f"mqtt://{token}")
+    host = parsed.hostname
+    if not host:
+        return token.split("@", 1)[-1]
+    host_token = f"[{host}]" if ":" in host and not host.startswith("[") else host
+    netloc = f"{host_token}:{parsed.port}" if parsed.port else host_token
+    redacted = urlunsplit((parsed.scheme or "mqtt", netloc, parsed.path, parsed.query, parsed.fragment))
+    return redacted if has_scheme else redacted.split("://", 1)[-1]

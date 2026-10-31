@@ -51,6 +51,7 @@ class FakeMqttModule:
                         "friendly_name": "Kitchen Plug",
                         "ieee_address": "0x00158d00018255df",
                         "type": "Router",
+                        "interview_state": "successful",
                         "supported": True,
                     }
                 ]
@@ -123,12 +124,35 @@ async def test_list_devices_reads_retained_bridge_devices_topic() -> None:
     assert result.response_topic == "zigbee2mqtt/bridge/devices"
     assert result.request_topic is None
     assert result.devices[0].friendly_name == "Kitchen Plug"
+    assert result.devices[0].interview_state == "successful"
+    assert result.devices[0].import_eligible is True
+    assert result.model_dump(mode="json")["server"] == "mqtt://broker.local:1884"
     fake_client = FakeMqttModule.instances[0]
     assert fake_client.host == "broker.local"
     assert fake_client.port == 1884
     assert fake_client.username == "user"
     assert fake_client.password == "pass"
     assert fake_client.subscriptions == ["zigbee2mqtt/bridge/devices"]
+
+
+def test_device_import_eligibility_uses_current_interview_state() -> None:
+    from piphi_network_zigbee2mqtt.bridge_models import Zigbee2MqttDevice
+
+    interviewing = Zigbee2MqttDevice(
+        friendly_name="Joining sensor",
+        interview_state="interviewing",
+        supported=True,
+    )
+    unsupported = Zigbee2MqttDevice(
+        friendly_name="Unknown sensor",
+        interview_state="successful",
+        supported=False,
+    )
+
+    assert interviewing.import_eligible is False
+    assert interviewing.import_blocked_reason == "interview_in_progress"
+    assert unsupported.import_eligible is False
+    assert unsupported.import_blocked_reason == "unsupported"
 
 
 @pytest.mark.anyio
